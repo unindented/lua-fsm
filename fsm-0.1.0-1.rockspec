@@ -1,8 +1,8 @@
 package = "fsm"
-version = "0.0.1-1"
+version = "0.1.0-1"
 source = {
   url = "git://github.com/unindented/lua-fsm",
-  tag = "v0.0.1"
+  tag = "v0.1.0"
 }
 description = {
   summary = "Simple FSM implementation.",
