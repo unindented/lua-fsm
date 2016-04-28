@@ -1,7 +1,7 @@
 package = "fsm"
 version = "0.0.1-1"
 source = {
-  url = "https://github.com/unindented/lua-fsm",
+  url = "git://github.com/unindented/lua-fsm",
   tag = "v0.0.1"
 }
 description = {
