@@ -1,14 +1,39 @@
+-- luacheck: globals unpack
+local unpack = unpack or table.unpack
+
 local M = {}
 
+local function do_callback(handler, args)
+  if handler then
+    return handler(unpack(args))
+  end
+end
+
 local function build_transition(self, event, states)
-  return function ()
+  return function (...)
     local from = self.current
     local to = states[from] or states["*"] or from
+    local args = {self, event, from, to, ...}
 
     assert(self.can(event),
       "cannot transition from state '" .. from .. "' with event '" .. event .. "'")
 
+    if do_callback(self["on_before_" .. event], args) == false
+    or do_callback(self["on_before_event"], args) == false
+    or do_callback(self["on_leave_" .. from], args) == false
+    or do_callback(self["on_leave_state"], args) == false then
+      return false
+    end
+
     self.current = to
+
+    do_callback(self["on_enter_" .. to] or self["on_" .. to], args)
+    do_callback(self["on_enter_state"] or self["on_state"], args)
+    do_callback(self["on_change_state"], args)
+    do_callback(self["on_after_" .. event] or self["on_" .. event], args)
+    do_callback(self["on_after_event"] or self["on_event"], args)
+
+    return true
   end
 end
 
@@ -28,6 +53,9 @@ function M.create(cfg, target)
 
   -- Events.
   local events = cfg.events or {}
+
+  -- Callbacks.
+  local callbacks = cfg.callbacks or {}
 
   -- Track state transitions allowed for an event.
   local states_for_event = {}
@@ -61,6 +89,10 @@ function M.create(cfg, target)
 
   for event, states in pairs(states_for_event) do
     self[event] = build_transition(self, event, states)
+  end
+
+  for name, callback in pairs(callbacks) do
+    self[name] = callback
   end
 
   self.current = "none"

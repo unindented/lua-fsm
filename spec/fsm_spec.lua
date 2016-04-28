@@ -204,28 +204,28 @@ describe("fsm", function ()
       end)
 
       it("reports current transitions to be panic and clear", function ()
-        m.warn();
+        m.warn()
         assert.is_same({"panic", "clear"}, m.transitions())
       end)
 
       it("reports current transitions to be calm", function ()
-        m.warn();
-        m.panic();
+        m.warn()
+        m.panic()
         assert.is_same({"calm"}, m.transitions())
       end)
 
       it("reports current transitions to be panic and clear", function ()
-        m.warn();
-        m.panic();
-        m.calm();
+        m.warn()
+        m.panic()
+        m.calm()
         assert.is_same({"panic", "clear"}, m.transitions())
       end)
 
       it("reports current transitions to be panic and clear", function ()
-        m.warn();
-        m.panic();
-        m.calm();
-        m.clear();
+        m.warn()
+        m.panic()
+        m.calm()
+        m.clear()
         assert.is_same({"warn"}, m.transitions())
       end)
     end)
@@ -296,13 +296,13 @@ describe("fsm", function ()
       end)
 
       it("is NOT finished when yellow", function ()
-        m.warn();
+        m.warn()
         assert.is_not_true(m.is_finished())
       end)
 
       it("is finished when yellow", function ()
-        m.warn();
-        m.panic();
+        m.warn()
+        m.panic()
         assert.is_true(m.is_finished())
       end)
     end)
@@ -323,13 +323,13 @@ describe("fsm", function ()
       end)
 
       it("is NOT finished when yellow", function ()
-        m.warn();
+        m.warn()
         assert.is_not_true(m.is_finished())
       end)
 
       it("is NOT finished when yellow", function ()
-        m.warn();
-        m.panic();
+        m.warn()
+        m.panic()
         assert.is_not_true(m.is_finished())
       end)
     end)
@@ -515,6 +515,132 @@ describe("fsm", function ()
       m.pause()
       m.stop()
       assert.are_equal("stopped", m.current)
+    end)
+  end)
+
+  describe("cancellable event", function ()
+    before_each(function ()
+      m = fsm.create({
+        initial = "green",
+        events = {
+          {name = "warn",  from = "green",  to = "yellow"},
+          {name = "panic", from = "yellow", to = "red"   },
+          {name = "calm",  from = "red",    to = "yellow"}
+        },
+        callbacks = {
+          on_before_warn = function () return false end
+        }
+      })
+    end)
+
+    it("starts with green", function ()
+      assert.are_equal("green", m.current)
+    end)
+
+    it("stays green when event is cancelled", function ()
+      m.warn()
+      assert.are_equal("green", m.current)
+    end)
+  end)
+
+  describe("callbacks", function ()
+    local called
+
+    local function track(name, args)
+      if args then
+        name = name .. "(" .. table.concat(args, ",") .. ")"
+      end
+      table.insert(called, name)
+    end
+
+    before_each(function ()
+      called = {}
+
+      m = fsm.create({
+        initial = "green",
+        events = {
+          {name = "warn",  from = "green",  to = "yellow"},
+          {name = "panic", from = "yellow", to = "red"   },
+          {name = "calm",  from = "red",    to = "yellow"},
+          {name = "clear", from = "yellow", to = "green" }
+        },
+        callbacks = {
+          -- generic callbacks
+          on_before_event = function (_, ...) track("on_before", {...}) end,
+          on_after_event  = function (_, ...) track("on_after", {...})  end,
+          on_enter_state  = function (_, ...) track("on_enter", {...})  end,
+          on_leave_state  = function (_, ...) track("on_leave", {...})  end,
+          on_change_state = function (_, ...) track("on_change", {...}) end,
+          -- specific state callbacks
+          on_enter_green  = function () track("on_enter_green")  end,
+          on_enter_yellow = function () track("on_enter_yellow") end,
+          on_enter_red    = function () track("on_enter_red")    end,
+          on_leave_green  = function () track("on_leave_green")  end,
+          on_leave_yellow = function () track("on_leave_yellow") end,
+          on_leave_red    = function () track("on_leave_red")    end,
+          -- specific event callbacks
+          on_before_warn  = function () track("on_before_warn")  end,
+          on_before_panic = function () track("on_before_panic") end,
+          on_before_calm  = function () track("on_before_calm")  end,
+          on_before_clear = function () track("on_before_clear") end,
+          on_after_warn   = function () track("on_after_warn")   end,
+          on_after_panic  = function () track("on_after_panic")  end,
+          on_after_calm   = function () track("on_after_calm")   end,
+          on_after_clear  = function () track("on_after_clear")  end
+        }
+      })
+    end)
+
+    it("invokes all callbacks when warn", function ()
+      m.warn()
+      assert.are_same({
+        "on_before(startup,none,green)",
+        "on_leave(startup,none,green)",
+        "on_enter_green",
+        "on_enter(startup,none,green)",
+        "on_change(startup,none,green)",
+        "on_after(startup,none,green)",
+        "on_before_warn",
+        "on_before(warn,green,yellow)",
+        "on_leave_green",
+        "on_leave(warn,green,yellow)",
+        "on_enter_yellow",
+        "on_enter(warn,green,yellow)",
+        "on_change(warn,green,yellow)",
+        "on_after_warn",
+        "on_after(warn,green,yellow)"
+      }, called)
+    end)
+
+    it("invokes all callbacks with additional arguments when panic", function ()
+      m.warn()
+      m.panic("foo", "bar")
+      assert.are_same({
+        "on_before(startup,none,green)",
+        "on_leave(startup,none,green)",
+        "on_enter_green",
+        "on_enter(startup,none,green)",
+        "on_change(startup,none,green)",
+        "on_after(startup,none,green)",
+        "on_before_warn",
+        "on_before(warn,green,yellow)",
+        "on_leave_green",
+        "on_leave(warn,green,yellow)",
+        "on_enter_yellow",
+        "on_enter(warn,green,yellow)",
+        "on_change(warn,green,yellow)",
+        "on_after_warn",
+        "on_after(warn,green,yellow)",
+        "on_before_panic",
+        "on_before(panic,yellow,red,foo,bar)",
+        "on_leave_yellow",
+        "on_leave(panic,yellow,red,foo,bar)",
+        "on_enter_red",
+        "on_enter(panic,yellow,red,foo,bar)",
+        "on_change(panic,yellow,red,foo,bar)",
+        "on_after_panic",
+        "on_after(panic,yellow,red,foo,bar)"
+      }, called)
     end)
   end)
 
