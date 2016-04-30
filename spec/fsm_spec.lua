@@ -518,6 +518,34 @@ describe("fsm", function ()
     end)
   end)
 
+  describe("deferrable startup", function ()
+    before_each(function ()
+      m = fsm.create({
+        initial = {state = "green", event = "init", defer = true},
+        events = {
+          {name = "warn",  from = "green",  to = "yellow"},
+          {name = "panic", from = "yellow", to = "red"   },
+          {name = "calm",  from = "red",    to = "yellow"}
+        }
+      })
+    end)
+
+    it("starts with none", function ()
+      assert.are_equal("none", m.current)
+    end)
+
+    it("is able to init from none to green", function ()
+      m.init()
+      assert.are_equal("green", m.current)
+    end)
+
+    it("is able to warn from green", function ()
+      m.init()
+      m.warn()
+      assert.are_equal("yellow", m.current)
+    end)
+  end)
+
   describe("cancellable event", function ()
     before_each(function ()
       m = fsm.create({

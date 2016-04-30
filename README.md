@@ -97,6 +97,21 @@ local alert = fsm.create({
 print(alert.current) -- "green"
 ```
 
+Finally, if you want to wait to call the initial state transition event until a later date you can defer it:
+
+```lua
+local alert = fsm.create({
+  initial = {state = "green", event = "init", defer = true},
+  events = {
+    {name = "panic", from = "green", to = "red"  },
+    {name = "calm",  from = "red",   to = "green"}
+  }
+})
+
+print(alert.current) -- "none"
+alert.init()
+print(alert.current) -- "green"
+```
 
 ### Callbacks
 

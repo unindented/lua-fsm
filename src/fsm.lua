@@ -129,7 +129,7 @@ function M.create(cfg, target)
     return self.is(terminal)
   end
 
-  if initial then
+  if initial and not initial.defer then
     self[initial_event]()
   end
 
