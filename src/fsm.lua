@@ -3,37 +3,104 @@ local unpack = unpack or table.unpack
 
 local M = {}
 
+M.WILDCARD      = "*"
+M.DEFERRED      = 0
+M.SUCCEEDED     = 1
+M.NO_TRANSITION = 2
+M.PENDING       = 3
+M.CANCELLED     = 4
+
 local function do_callback(handler, args)
   if handler then
     return handler(unpack(args))
   end
 end
 
+local function before_event(self, event, _, _, args)
+  local specific = do_callback(self["on_before_" .. event], args)
+  local general = do_callback(self["on_before_event"], args)
+
+  if specific == false or general == false then
+    return false
+  end
+end
+
+local function after_event(self, event, _, _, args)
+  do_callback(self["on_after_" .. event] or self["on_" .. event], args)
+  do_callback(self["on_after_event"] or self["on_event"], args)
+end
+
+local function enter_state(self, _, _, to, args)
+  do_callback(self["on_enter_" .. to] or self["on_" .. to], args)
+  do_callback(self["on_enter_state"] or self["on_state"], args)
+end
+
+local function leave_state(self, _, from, _, args)
+  local specific = do_callback(self["on_leave_" .. from], args)
+  local general = do_callback(self["on_leave_state"], args)
+
+  if specific == false or general == false then
+    return false
+  end
+  if specific == M.DEFERRED or general == M.DEFERRED then
+    return M.DEFERRED
+  end
+end
+
 local function build_transition(self, event, states)
   return function (...)
     local from = self.current
-    local to = states[from] or states["*"] or from
+    local to = states[from] or states[M.WILDCARD] or from
     local args = {self, event, from, to, ...}
 
-    assert(self.can(event),
-      "cannot transition from state '" .. from .. "' with event '" .. event .. "'")
+    assert(self.confirm == nil and self.cancel == nil,
+      "previous transition still pending")
 
-    if do_callback(self["on_before_" .. event], args) == false
-    or do_callback(self["on_before_event"], args) == false
-    or do_callback(self["on_leave_" .. from], args) == false
-    or do_callback(self["on_leave_state"], args) == false then
-      return false
+    assert(self.can(event),
+      "invalid transition from state '" .. from .. "' with event '" .. event .. "'")
+
+    local before = before_event(self, event, from, to, args)
+    if before == false then
+      return M.CANCELLED
     end
 
-    self.current = to
+    if from == to then
+      after_event(self, event, from, to, args)
+      return M.NO_TRANSITION
+    end
 
-    do_callback(self["on_enter_" .. to] or self["on_" .. to], args)
-    do_callback(self["on_enter_state"] or self["on_state"], args)
-    do_callback(self["on_change_state"], args)
-    do_callback(self["on_after_" .. event] or self["on_" .. event], args)
-    do_callback(self["on_after_event"] or self["on_event"], args)
+    self.confirm = function ()
+      self.confirm = nil
+      self.cancel = nil
 
-    return true
+      self.current = to
+
+      enter_state(self, event, from, to, args)
+      after_event(self, event, from, to, args)
+
+      return M.SUCCEEDED
+    end
+
+    self.cancel = function ()
+      self.confirm = nil
+      self.cancel = nil
+
+      after_event(self, event, from, to, args)
+
+      return M.CANCELLED
+    end
+
+    local leave = leave_state(self, event, from, to, args)
+    if leave == false then
+      return M.CANCELLED
+    end
+    if leave == M.DEFERRED then
+      return M.PENDING
+    end
+
+    if self.confirm then
+      return self.confirm()
+    end
   end
 end
 
@@ -65,7 +132,7 @@ function M.create(cfg, target)
 
   local function add(e)
     -- Allow wildcard transition if `from` is not specified.
-    local from = type(e.from) == "table" and e.from or (e.from and {e.from} or {"*"})
+    local from = type(e.from) == "table" and e.from or (e.from and {e.from} or {M.WILDCARD})
     local to = e.to
     local event = e.name
 
@@ -113,7 +180,7 @@ function M.create(cfg, target)
 
   function self.can(event)
     local states = states_for_event[event]
-    local to = states[self.current] or states["*"]
+    local to = states[self.current] or states[M.WILDCARD]
     return to ~= nil
   end
 

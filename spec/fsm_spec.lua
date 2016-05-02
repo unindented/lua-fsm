@@ -335,6 +335,67 @@ describe("fsm", function ()
     end)
   end)
 
+  describe("event return values", function ()
+    before_each(function ()
+      m = fsm.create({
+        initial = "stopped",
+        events = {
+          {name = "prepare", from = "stopped", to = "ready"  },
+          {name = "fake",    from = "ready",   to = "running"},
+          {name = "start",   from = "ready",   to = "running"},
+          {name = "start",   from = "running"                }
+        },
+        callbacks = {
+          on_before_fake = function () return false end,
+          on_leave_ready = function () return fsm.DEFERRED end
+        }
+      })
+    end)
+
+    it("starts with stopped", function ()
+      assert.are_equal("stopped", m.current)
+    end)
+
+    it("reports event to have succeeded", function ()
+      assert.are_equal(fsm.SUCCEEDED, m.prepare())
+      assert.are_equal("ready", m.current)
+    end)
+
+    it("reports event to have been cancelled", function ()
+      m.prepare()
+      assert.are_equal(fsm.CANCELLED, m.fake())
+      assert.are_equal("ready", m.current)
+    end)
+
+    it("reports event to be pending", function ()
+      m.prepare()
+      assert.are_equal(fsm.PENDING, m.start())
+      assert.are_equal("ready", m.current)
+    end)
+
+    it("reports deferred transition to have succeeded", function ()
+      m.prepare()
+      m.start()
+      assert.are_equal(fsm.SUCCEEDED, m.confirm())
+      assert.are_equal("running", m.current)
+    end)
+
+    it("reports deferred transition to have been cancelled", function ()
+      m.prepare()
+      m.start()
+      assert.are_equal(fsm.CANCELLED, m.cancel())
+      assert.are_equal("ready", m.current)
+    end)
+
+    it("reports event to cause no transition", function ()
+      m.prepare()
+      m.start()
+      m.confirm()
+      assert.are_equal(fsm.NO_TRANSITION, m.start())
+      assert.are_equal("running", m.current)
+    end)
+  end)
+
   describe("invalid events", function ()
     before_each(function ()
       m = fsm.create({
@@ -353,38 +414,85 @@ describe("fsm", function ()
 
     it("throws if we try to panic from green", function ()
       assert.has_errors(function () m.panic() end,
-        "cannot transition from state 'green' with event 'panic'")
+        "invalid transition from state 'green' with event 'panic'")
     end)
 
     it("throws if we try to calm from green", function ()
       assert.has_errors(function () m.calm() end,
-        "cannot transition from state 'green' with event 'calm'")
+        "invalid transition from state 'green' with event 'calm'")
     end)
 
     it("throws if we try to warn from yellow", function ()
       m.warn()
       assert.has_errors(function () m.warn() end,
-        "cannot transition from state 'yellow' with event 'warn'")
+        "invalid transition from state 'yellow' with event 'warn'")
     end)
 
     it("throws if we try to calm from yellow", function ()
       m.warn()
       assert.has_errors(function () m.calm() end,
-        "cannot transition from state 'yellow' with event 'calm'")
+        "invalid transition from state 'yellow' with event 'calm'")
     end)
 
     it("throws if we try to warn from red", function ()
       m.warn()
       m.panic()
       assert.has_errors(function () m.warn() end,
-        "cannot transition from state 'red' with event 'warn'")
+        "invalid transition from state 'red' with event 'warn'")
     end)
 
     it("throws if we try to panic from red", function ()
       m.warn()
       m.panic()
       assert.has_errors(function () m.panic() end,
-        "cannot transition from state 'red' with event 'panic'")
+        "invalid transition from state 'red' with event 'panic'")
+    end)
+  end)
+
+  describe("invalid transitions", function ()
+    before_each(function ()
+      m = fsm.create({
+        initial = "green",
+        events = {
+          {name = "warn",  from = "green",  to = "yellow"},
+          {name = "panic", from = "yellow", to = "red"   },
+          {name = "calm",  from = "red",    to = "yellow"},
+          {name = "clear", from = "yellow", to = "green" }
+        },
+        callbacks = {
+          on_leave_green  = function() return fsm.DEFERRED end,
+          on_leave_yellow = function() return fsm.DEFERRED end,
+          on_leave_red    = function() return fsm.DEFERRED end
+        }
+      })
+    end)
+
+    it("starts with green", function ()
+      assert.are_equal("green", m.current)
+    end)
+
+    it("throws if we try to panic from yellow without confirming the previous transition", function ()
+      m.warn()
+      assert.has_errors(function () m.panic() end,
+        "previous transition still pending")
+    end)
+
+    it("throws if we try to calm from red without confirming the previous transition", function ()
+      m.warn()
+      m.confirm()
+      m.panic()
+      assert.has_errors(function () m.calm() end,
+        "previous transition still pending")
+    end)
+
+    it("throws if we try to clear from yellow without confirming the previous transition", function ()
+      m.warn()
+      m.confirm()
+      m.panic()
+      m.confirm()
+      m.calm()
+      assert.has_errors(function () m.clear() end,
+        "previous transition still pending")
     end)
   end)
 
@@ -443,11 +551,11 @@ describe("fsm", function ()
       m = fsm.create({
         initial = "stopped",
         events = {
-          {name = 'prepare', from = 'stopped', to = 'ready'  },
-          {name = 'start',   from = 'ready',   to = 'running'},
-          {name = 'resume',  from = 'paused',  to = 'running'},
-          {name = 'pause',   from = 'running', to = 'paused' },
-          {name = 'stop',                      to = 'stopped'}
+          {name = "prepare", from = "stopped", to = "ready"  },
+          {name = "start",   from = "ready",   to = "running"},
+          {name = "resume",  from = "paused",  to = "running"},
+          {name = "pause",   from = "running", to = "paused" },
+          {name = "stop",                      to = "stopped"}
         }
       })
     end)
@@ -598,7 +706,6 @@ describe("fsm", function ()
           on_after_event  = function (_, ...) track("on_after", {...})  end,
           on_enter_state  = function (_, ...) track("on_enter", {...})  end,
           on_leave_state  = function (_, ...) track("on_leave", {...})  end,
-          on_change_state = function (_, ...) track("on_change", {...}) end,
           -- specific state callbacks
           on_enter_green  = function () track("on_enter_green")  end,
           on_enter_yellow = function () track("on_enter_yellow") end,
@@ -626,7 +733,6 @@ describe("fsm", function ()
         "on_leave(startup,none,green)",
         "on_enter_green",
         "on_enter(startup,none,green)",
-        "on_change(startup,none,green)",
         "on_after(startup,none,green)",
         "on_before_warn",
         "on_before(warn,green,yellow)",
@@ -634,7 +740,6 @@ describe("fsm", function ()
         "on_leave(warn,green,yellow)",
         "on_enter_yellow",
         "on_enter(warn,green,yellow)",
-        "on_change(warn,green,yellow)",
         "on_after_warn",
         "on_after(warn,green,yellow)"
       }, called)
@@ -648,7 +753,6 @@ describe("fsm", function ()
         "on_leave(startup,none,green)",
         "on_enter_green",
         "on_enter(startup,none,green)",
-        "on_change(startup,none,green)",
         "on_after(startup,none,green)",
         "on_before_warn",
         "on_before(warn,green,yellow)",
@@ -656,7 +760,6 @@ describe("fsm", function ()
         "on_leave(warn,green,yellow)",
         "on_enter_yellow",
         "on_enter(warn,green,yellow)",
-        "on_change(warn,green,yellow)",
         "on_after_warn",
         "on_after(warn,green,yellow)",
         "on_before_panic",
@@ -665,10 +768,33 @@ describe("fsm", function ()
         "on_leave(panic,yellow,red,foo,bar)",
         "on_enter_red",
         "on_enter(panic,yellow,red,foo,bar)",
-        "on_change(panic,yellow,red,foo,bar)",
         "on_after_panic",
         "on_after(panic,yellow,red,foo,bar)"
       }, called)
+    end)
+  end)
+
+  describe("callbacks throwing errors", function ()
+    before_each(function ()
+      m = fsm.create({
+        initial = "green",
+        events = {
+          {name = "warn",  from = "green",  to = "yellow"},
+          {name = "panic", from = "yellow", to = "red"   },
+          {name = "calm",  from = "red",    to = "yellow"}
+        },
+        callbacks = {
+          on_enter_yellow = function () error("oops") end
+        }
+      })
+    end)
+
+    it("starts with green", function ()
+      assert.are_equal("green", m.current)
+    end)
+
+    it("does not swallow generated error", function ()
+      assert.has_errors(function () m.warn() end, "oops")
     end)
   end)
 

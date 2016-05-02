@@ -1,6 +1,6 @@
 # lua-fsm [![Version](https://img.shields.io/badge/luarocks-0.1.1-blue.svg)](https://luarocks.org/modules/unindented/fsm) [![Build Status](https://img.shields.io/travis/unindented/lua-fsm.svg)](http://travis-ci.org/unindented/lua-fsm) [![Coverage Status](https://img.shields.io/coveralls/unindented/lua-fsm.svg)](https://coveralls.io/r/unindented/lua-fsm)
 
-A simple finite-state machine implementation for Lua. Ported from [@jakesgordon's `javascript-finite-state-machine`](https://github.com/jakesgordon/javascript-state-machine).
+A simple finite-state machine implementation for Lua. Based on [@jakesgordon's `javascript-finite-state-machine`](https://github.com/jakesgordon/javascript-state-machine).
 
 
 ## Installation
@@ -177,6 +177,30 @@ The order in which callbacks occur is as follows, assuming event `calm` transiti
  * `on_enter_state`  - generic  handler for all states
  * `on_after_calm`   - specific handler for the **calm** event only
  * `on_after_event`  - generic  handler for all events
+
+### Deferred state transitions
+
+You may need to execute additional code during a state transition, and ensure the new state is not entered until your code has completed, e.g. fading a menu screen.
+
+One way to do this is to return `fsm.DEFERRED` from your `on_leave_state` handler, and the state machine will be put on hold until you are ready to confirm the transition by calling the `confirm` method, or cancel it by calling the `cancel` method:
+
+```lua
+local screens = fsm.create({
+  initial = "menu",
+  events = {
+    {name = "play", from = "menu", to = "game"},
+    {name = "quit", from = "game", to = "menu"}
+  },
+  callbacks = {
+    on_leave_menu = function (self)
+      fade_out(0.5, self.confirm)
+      return fsm.DEFERRED
+    end
+  }
+})
+
+screens.play()
+```
 
 
 ## Meta
