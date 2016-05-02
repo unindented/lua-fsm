@@ -659,12 +659,12 @@ describe("fsm", function ()
       m = fsm.create({
         initial = "green",
         events = {
-          {name = "warn",  from = "green",  to = "yellow"},
-          {name = "panic", from = "yellow", to = "red"   },
-          {name = "calm",  from = "red",    to = "yellow"}
+          {name = "warn",  from = "green", to = "yellow"},
+          {name = "panic", from = "green", to = "red"   }
         },
         callbacks = {
-          on_before_warn = function () return false end
+          on_before_warn = function () return false end,
+          on_leave_green = function () return false end
         }
       })
     end)
@@ -673,8 +673,13 @@ describe("fsm", function ()
       assert.are_equal("green", m.current)
     end)
 
-    it("stays green when event is cancelled", function ()
+    it("stays green when warn event is cancelled", function ()
       m.warn()
+      assert.are_equal("green", m.current)
+    end)
+
+    it("stays green when panic event is cancelled", function ()
+      m.panic()
       assert.are_equal("green", m.current)
     end)
   end)

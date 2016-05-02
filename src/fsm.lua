@@ -25,16 +25,6 @@ local function before_event(self, event, _, _, args)
   end
 end
 
-local function after_event(self, event, _, _, args)
-  do_callback(self["on_after_" .. event] or self["on_" .. event], args)
-  do_callback(self["on_after_event"] or self["on_event"], args)
-end
-
-local function enter_state(self, _, _, to, args)
-  do_callback(self["on_enter_" .. to] or self["on_" .. to], args)
-  do_callback(self["on_enter_state"] or self["on_state"], args)
-end
-
 local function leave_state(self, _, from, _, args)
   local specific = do_callback(self["on_leave_" .. from], args)
   local general = do_callback(self["on_leave_state"], args)
@@ -45,6 +35,16 @@ local function leave_state(self, _, from, _, args)
   if specific == M.DEFERRED or general == M.DEFERRED then
     return M.DEFERRED
   end
+end
+
+local function enter_state(self, _, _, to, args)
+  do_callback(self["on_enter_" .. to] or self["on_" .. to], args)
+  do_callback(self["on_enter_state"] or self["on_state"], args)
+end
+
+local function after_event(self, event, _, _, args)
+  do_callback(self["on_after_" .. event] or self["on_" .. event], args)
+  do_callback(self["on_after_event"] or self["on_event"], args)
 end
 
 local function build_transition(self, event, states)
