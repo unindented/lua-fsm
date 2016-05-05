@@ -278,6 +278,30 @@ describe("fsm", function ()
     end)
   end)
 
+  describe("#is_pending", function ()
+    before_each(function ()
+      m = fsm.create({
+        initial = "green",
+        events = {
+          {name = "warn",  from = "green",  to = "yellow"},
+          {name = "panic", from = "yellow", to = "red"   }
+        },
+        callbacks = {
+          on_leave_green = function () return fsm.DEFERRED end
+        }
+      })
+    end)
+
+    it("is NOT pending when green", function ()
+      assert.is_not_true(m.is_pending())
+    end)
+
+    it("is pending when leaving green", function ()
+      m.warn()
+      assert.is_true(m.is_pending())
+    end)
+  end)
+
   describe("#is_finished", function ()
     describe("with terminal state", function ()
       before_each(function ()

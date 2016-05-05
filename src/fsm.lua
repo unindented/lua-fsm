@@ -53,7 +53,7 @@ local function build_transition(self, event, states)
     local to = states[from] or states[M.WILDCARD] or from
     local args = {self, event, from, to, ...}
 
-    assert(self.confirm == nil and self.cancel == nil,
+    assert(not self.is_pending(),
       "previous transition still pending")
 
     assert(self.can(event),
@@ -190,6 +190,10 @@ function M.create(cfg, target)
 
   function self.transitions()
     return events_for_state[self.current]
+  end
+
+  function self.is_pending()
+    return self.confirm ~= nil
   end
 
   function self.is_finished()
