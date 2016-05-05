@@ -1,4 +1,4 @@
-# lua-fsm [![Version](https://img.shields.io/badge/luarocks-1.0.0-blue.svg)](https://luarocks.org/modules/unindented/fsm) [![Build Status](https://img.shields.io/travis/unindented/lua-fsm.svg)](http://travis-ci.org/unindented/lua-fsm) [![Coverage Status](https://img.shields.io/coveralls/unindented/lua-fsm.svg)](https://coveralls.io/r/unindented/lua-fsm)
+# lua-fsm [![Version](https://img.shields.io/badge/luarocks-1.1.0-blue.svg)](https://luarocks.org/modules/unindented/fsm) [![Build Status](https://img.shields.io/travis/unindented/lua-fsm.svg)](http://travis-ci.org/unindented/lua-fsm) [![Coverage Status](https://img.shields.io/coveralls/unindented/lua-fsm.svg)](https://coveralls.io/r/unindented/lua-fsm)
 
 A simple finite-state machine implementation for Lua. Based on [@jakesgordon's `javascript-finite-state-machine`](https://github.com/jakesgordon/javascript-state-machine).
 
