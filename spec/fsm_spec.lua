@@ -276,6 +276,85 @@ describe("fsm", function ()
         assert.is_same({"warn", "panic"}, m.transitions())
       end)
     end)
+
+    describe("with looping", function ()
+      local done_before_loop = false
+      local done_leave_green = false
+      local done_enter_green = false
+      local done_after_loop = false
+
+      function reset_flags()
+        done_before_loop = false
+        done_leave_green = false
+        done_enter_green = false
+        done_after_loop = false
+      end
+
+      before_each(function ()
+        reset_flags()
+
+        m = fsm.create({
+          initial = "green",
+          events = {
+            {name = "warn",  from = "green",  to = "yellow"},
+            {name = "loop",  from = "green",  to = "green"},
+            {name = "panic", from = "yellow", to = "red"   },
+            {name = "calm",  from = "red",    to = "yellow"},
+            {name = "clear", from = "yellow", to = "green" }
+          },
+          callbacks = {
+            on_before_loop = function () done_before_loop = true end,
+            on_leave_green = function () done_leave_green = true end,
+            on_enter_green = function () done_enter_green = true end,
+            on_after_loop = function () done_after_loop = true end,
+          }
+        })
+      end)
+
+      it("starts with green", function ()
+        assert.are_equal("green", m.current)
+        assert.is_not_true(done_before_loop)
+        assert.is_not_true(done_leave_green)
+        assert.is_true(done_enter_green)
+        assert.is_not_true(done_after_loop)
+      end)
+
+      it("reports current transitions to be warn and loop", function ()
+        assert.is_same({"warn", "loop"}, m.transitions())
+      end)
+
+      it("warn leads to yellow and correct actions", function ()
+        reset_flags()
+        m.warn()
+        assert.are_equal("yellow", m.current)
+        assert.is_not_true(done_before_loop)
+        assert.is_true(done_leave_green)
+        assert.is_not_true(done_enter_green)
+        assert.is_not_true(done_after_loop)
+      end)
+
+      it("clear leads to green and correct actions", function ()
+        m.warn()
+        reset_flags()
+        m.clear()
+        assert.are_equal("green", m.current)
+        assert.is_not_true(done_before_loop)
+        assert.is_not_true(done_leave_green)
+        assert.is_true(done_enter_green)
+        assert.is_not_true(done_after_loop)
+      end)
+
+      it("loop leads to green and correct actions", function ()
+        reset_flags()
+        m.loop()
+        assert.are_equal("green", m.current)
+        assert.is_true(done_before_loop)
+        assert.is_true(done_leave_green)
+        assert.is_true(done_enter_green)
+        assert.is_true(done_after_loop)
+      end)
+
+    end)
   end)
 
   describe("#is_pending", function ()
