@@ -180,6 +180,7 @@ function M.create(cfg, target)
 
   function self.can(event)
     local states = states_for_event[event]
+    if states == nil then return false end
     local to = states[self.current] or states[M.WILDCARD]
     return to ~= nil
   end

@@ -123,6 +123,10 @@ describe("fsm", function ()
       assert.are_equal("green", m.current)
     end)
 
+    it("does not error on unrecognized event", function ()
+      assert.is_not_true(m.can("something else"))
+    end)
+
     it("is able to warn from green state", function ()
       assert.is_true(m.can("warn"))
     end)
